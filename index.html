@@ -1,0 +1,646 @@
+
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Misi Integriti Perpustakaan</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg,#e8f5e9,#fff8e1);
+  color: #244333;
+}
+
+.container {
+  max-width: 850px;
+  margin: auto;
+  padding: 20px;
+}
+
+header {
+  background: #2e7651;
+  color: white;
+  text-align: center;
+  padding: 28px 16px;
+  border-radius: 22px;
+  margin-bottom: 20px;
+}
+
+header h1 { margin: 8px 0; }
+
+.card {
+  background: white;
+  border-radius: 18px;
+  padding: 22px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 16px #00000012;
+}
+
+h2 { color: #286342; margin-top: 0; }
+
+input {
+  width: 100%;
+  padding: 13px;
+  margin: 8px 0 16px;
+  border: 2px solid #d5e7d9;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+button {
+  border: 0;
+  border-radius: 12px;
+  padding: 14px 20px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.primary { background: #28794e; color: white; }
+.secondary { background: #e5f2e8; color: #245b3b; }
+
+.center { text-align: center; }
+.hidden { display: none !important; }
+
+.timer {
+  display: inline-block;
+  padding: 12px 24px;
+  border-radius: 30px;
+  background: #fff0c2;
+  color: #795500;
+  font-size: 23px;
+  font-weight: bold;
+}
+
+.progress-wrap {
+  background: #e7eee8;
+  height: 12px;
+  border-radius: 20px;
+  overflow: hidden;
+  margin: 15px 0;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0;
+  background: #31945e;
+  transition: width .3s;
+}
+
+.scenario-text {
+  background: #f1f8f1;
+  border-radius: 14px;
+  padding: 20px;
+  font-size: 20px;
+  line-height: 1.7;
+  margin: 15px 0;
+}
+
+.camera-area {
+  background: #f4f7f4;
+  border: 2px dashed #9cbea5;
+  border-radius: 15px;
+  padding: 15px;
+  text-align: center;
+}
+
+#camera canvas {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.status {
+  background: #eaf4ec;
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 12px;
+  font-weight: bold;
+  line-height: 1.5;
+}
+
+.feedback {
+  padding: 16px;
+  border-radius: 12px;
+  margin-top: 15px;
+  line-height: 1.6;
+}
+
+.correct { background: #e0f4e5; color: #176332; }
+.incorrect { background: #ffeded; color: #9b2929; }
+
+.small {
+  font-size: 13px;
+  color: #63766a;
+  line-height: 1.5;
+}
+
+.score {
+  font-size: 44px;
+  font-weight: bold;
+  color: #28794e;
+}
+
+footer {
+  text-align: center;
+  color: #65786b;
+  font-size: 13px;
+  padding: 15px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+  <div style="font-size:42px">📚 🌱</div>
+  <h1>MISI INTEGRITI PERPUSTAKAAN</h1>
+  <p>Jadilah murid yang berintegriti dan bertanggungjawab!</p>
+</header>
+
+<section id="startScreen" class="card">
+  <h2 class="center">Selamat Datang, Wira Integriti!</h2>
+  <p class="center">
+    Baca setiap senario. Kemudian, tunjukkan keputusan kamu
+    di hadapan kamera menggunakan isyarat ibu jari.
+  </p>
+
+  <label for="studentName"><b>Nama murid</b></label>
+  <input id="studentName" type="text" maxlength="80"
+         placeholder="Masukkan nama murid">
+
+  <label for="studentClass"><b>Kelas</b></label>
+  <input id="studentClass" type="text" maxlength="40"
+         placeholder="Contoh: 4 Bestari">
+
+  <div class="center">
+    <p>⏱️ Masa menjawab: <b>10 minit</b></p>
+    <p>👍 Ibu jari ke atas = BERINTEGRITI</p>
+    <p>👎 Ibu jari ke bawah = TIDAK BERINTEGRITI</p>
+    <button class="primary" id="startButton" onclick="startActivity()">
+      MULA MISI
+    </button>
+  </div>
+
+  <p class="small center">
+    Benarkan akses kamera apabila pelayar memintanya.
+    Pastikan pencahayaan mencukupi.
+  </p>
+  <p id="startError" class="small center" role="alert"></p>
+</section>
+
+<section id="gameScreen" class="hidden">
+
+  <div class="card center">
+    <div class="timer" id="timer">10:00</div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <p id="progressText">Senario 1 daripada 4</p>
+  </div>
+
+  <div class="card">
+    <p id="scenarioNumber"><b>SENARIO 1</b></p>
+    <h2 id="scenarioTitle"></h2>
+    <div class="scenario-text" id="scenarioText"></div>
+    <p><b>Apakah tindakan yang ditunjukkan dalam senario ini?</b></p>
+    <p class="small">
+      Tunjukkan ibu jari ke atas jika BERINTEGRITI atau ibu jari
+      ke bawah jika TIDAK BERINTEGRITI.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2 class="center">📷 Kamera Pengesan AI</h2>
+    <div class="camera-area">
+      <div id="camera"></div>
+      <div class="status" id="aiStatus">
+        Kamera belum diaktifkan.
+      </div>
+      <p class="small" id="confidenceText">
+        Sistem sedang menunggu isyarat tangan.
+      </p>
+    </div>
+
+    <div id="feedbackBox" class="feedback hidden" role="status"></div>
+
+    <div class="center">
+      <button id="nextButton" class="primary hidden"
+              onclick="nextScenario()">
+        SENARIO SETERUSNYA
+      </button>
+    </div>
+  </div>
+</section>
+
+<section id="resultScreen" class="card center hidden">
+  <div style="font-size:55px">🏆</div>
+  <h2>MISI SELESAI!</h2>
+  <p id="resultName"></p>
+  <div class="score" id="finalScore">0/4</div>
+  <h3 id="finalPercentage">0%</h3>
+  <p id="resultMessage"></p>
+  <div id="submissionStatus" class="status">
+    Menyediakan rekod...
+  </div>
+  <p class="small">
+    Terima kasih kerana menyertai Misi Integriti Perpustakaan!
+  </p>
+</section>
+
+<footer>
+  Aktiviti Pembelajaran Digital | Misi Integriti Perpustakaan
+</footer>
+
+</div>
+
+<script>
+// ========================================
+// PAUTAN MODEL DAN GOOGLE SHEETS
+// ========================================
+
+const MODEL_URL =
+  "https://teachablemachine.withgoogle.com/models/liGGPXdwb/";
+
+const SHEETS_URL =
+  "https://script.google.com/macros/s/AKfycbzu_xVaH0xt2pIv4KNlA3inqn8NrI9jXAjmB1GNkVKrcFTi8ZYZXPlvq62dCkowAHW9/exec";
+
+// Tetapan pengesanan
+const CONFIDENCE_LIMIT = 0.90;
+const STABLE_TIME = 1200;
+const TOTAL_TIME = 600;
+
+// ========================================
+// SENARIO PEMBELAJARAN
+// ========================================
+
+const scenarios = [
+  {
+    title: "Buku Rujukan yang Rosak",
+    text: "Danial sedang membaca buku rujukan di perpustakaan. Dia ternampak beberapa halaman buku tersebut telah dikoyakkan dan diconteng. Danial segera melaporkan keadaan itu kepada pustakawan supaya tindakan dapat diambil.",
+    answer: "BERINTEGRITI",
+    explanation: "Danial menunjukkan sikap bertanggungjawab dengan melaporkan kerosakan buku. Tindakan ini membantu menjaga kemudahan perpustakaan."
+  },
+  {
+    title: "Makanan di Perpustakaan",
+    text: "Farhan membawa keropok dan minuman manis ke meja bacaan perpustakaan. Dia makan dan minum di situ, kemudian meninggalkan sisa makanan di atas meja.",
+    answer: "TIDAK BERINTEGRITI",
+    explanation: "Farhan tidak mematuhi peraturan perpustakaan dan tidak menjaga kebersihan ruang bacaan."
+  },
+  {
+    title: "Buku Rujukan Terakhir",
+    text: "Aiman melihat hanya sebuah buku rujukan yang tinggal di rak. Dia menyembunyikan buku itu di dalam beg supaya murid lain tidak dapat meminjamnya.",
+    answer: "TIDAK BERINTEGRITI",
+    explanation: "Aiman tidak menunjukkan sikap adil dan bertanggungjawab kerana menghalang murid lain daripada menggunakan bahan bacaan."
+  },
+  {
+    title: "Memulangkan Buku",
+    text: "Mei Ling telah meminjam sebuah buku cerita dari perpustakaan. Dia memulangkan buku tersebut pada tarikh yang ditetapkan supaya murid lain juga dapat meminjamnya.",
+    answer: "BERINTEGRITI",
+    explanation: "Mei Ling menunjukkan sikap amanah dan bertanggungjawab dengan memulangkan buku mengikut tarikh yang ditetapkan."
+  }
+];
+
+// ========================================
+// PEMBOLEH UBAH AKTIVITI
+// ========================================
+
+let model = null;
+let webcam = null;
+let currentScenario = 0;
+let score = 0;
+let answers = [];
+let secondsLeft = TOTAL_TIME;
+let timerInterval = null;
+let animationFrame = null;
+let stableLabel = "";
+let stableStart = 0;
+let locked = false;
+let finished = false;
+let detecting = false;
+let studentName = "";
+let studentClass = "";
+
+// ========================================
+// MULAKAN AKTIVITI
+// ========================================
+
+async function startActivity() {
+  studentName = document.getElementById("studentName").value.trim();
+  studentClass = document.getElementById("studentClass").value.trim();
+
+  const errorBox = document.getElementById("startError");
+  errorBox.textContent = "";
+
+  if (!studentName || !studentClass) {
+    errorBox.textContent = "Sila isi nama dan kelas terlebih dahulu.";
+    return;
+  }
+
+  document.getElementById("startButton").disabled = true;
+  errorBox.textContent = "Sedang memuatkan model AI dan kamera...";
+
+  try {
+    model = await tmImage.load(
+      MODEL_URL + "model.json",
+      MODEL_URL + "metadata.json"
+    );
+
+    webcam = new tmImage.Webcam(320, 240, true);
+    await webcam.setup();
+    await webcam.play();
+
+    document.getElementById("camera").replaceChildren(webcam.canvas);
+    document.getElementById("startScreen").classList.add("hidden");
+    document.getElementById("gameScreen").classList.remove("hidden");
+
+    showScenario();
+    startTimer();
+    detectLoop();
+
+  } catch (error) {
+    console.error(error);
+    document.getElementById("startButton").disabled = false;
+    errorBox.textContent =
+      "Model atau kamera gagal dimuatkan. Semak sambungan internet, pautan model dan kebenaran kamera. Cuba buka laman menggunakan Chrome.";
+  }
+}
+
+// ========================================
+// PAPARKAN SENARIO
+// ========================================
+
+function showScenario() {
+  locked = false;
+  stableLabel = "";
+  stableStart = 0;
+
+  const item = scenarios[currentScenario];
+
+  document.getElementById("scenarioNumber").textContent =
+    "SENARIO " + (currentScenario + 1);
+
+  document.getElementById("scenarioTitle").textContent = item.title;
+  document.getElementById("scenarioText").textContent = item.text;
+
+  document.getElementById("progressText").textContent =
+    "Senario " + (currentScenario + 1) + " daripada 4";
+
+  document.getElementById("progressBar").style.width =
+    (currentScenario / 4 * 100) + "%";
+
+  document.getElementById("aiStatus").textContent =
+    "Tunjukkan isyarat ibu jari di hadapan kamera.";
+
+  document.getElementById("confidenceText").textContent =
+    "Menunggu pengesanan isyarat...";
+
+  document.getElementById("feedbackBox").classList.add("hidden");
+  document.getElementById("nextButton").classList.add("hidden");
+}
+
+// ========================================
+// PENGESANAN ISYARAT TEACHABLE MACHINE
+// ========================================
+
+function normalizeLabel(label) {
+  return String(label).trim().toUpperCase().replace(/\s+/g, " ");
+}
+
+async function detectLoop() {
+  if (finished || !webcam || !model) return;
+
+  webcam.update();
+
+  if (!locked && !detecting) {
+    detecting = true;
+
+    try {
+      const predictions = await model.predict(webcam.canvas);
+      predictions.sort((a, b) => b.probability - a.probability);
+
+      const best = predictions[0];
+      const label = normalizeLabel(best.className);
+      const confidence = best.probability;
+
+      document.getElementById("confidenceText").textContent =
+        "Keyakinan AI: " + (confidence * 100).toFixed(1) + "%";
+
+      if (
+        (label === "BERINTEGRITI" ||
+         label === "TIDAK BERINTEGRITI") &&
+        confidence >= CONFIDENCE_LIMIT
+      ) {
+        if (stableLabel !== label) {
+          stableLabel = label;
+          stableStart = Date.now();
+        }
+
+        const elapsed = Date.now() - stableStart;
+
+        document.getElementById("aiStatus").textContent =
+          "Isyarat dikesan: " + label +
+          ". Kekalkan isyarat sebentar...";
+
+        if (elapsed >= STABLE_TIME) {
+          recordAnswer(label);
+        }
+      } else {
+        stableLabel = "";
+        stableStart = 0;
+
+        document.getElementById("aiStatus").textContent =
+          "Isyarat belum jelas. Cuba tunjukkan ibu jari dengan lebih jelas.";
+      }
+
+    } catch (error) {
+      console.error(error);
+      document.getElementById("aiStatus").textContent =
+        "Pengesanan mengalami masalah. Cuba lagi.";
+    } finally {
+      detecting = false;
+    }
+  }
+
+  if (!finished) {
+    animationFrame = requestAnimationFrame(detectLoop);
+  }
+}
+
+// ========================================
+// SEMAK DAN SIMPAN JAWAPAN
+// ========================================
+
+function recordAnswer(detectedLabel) {
+  if (locked || finished) return;
+
+  locked = true;
+
+  const item = scenarios[currentScenario];
+  const isCorrect = detectedLabel === item.answer;
+
+  if (isCorrect) score++;
+
+  answers.push({
+    senario: currentScenario + 1,
+    jawapan: detectedLabel,
+    betul: isCorrect ? "Betul" : "Salah"
+  });
+
+  document.getElementById("aiStatus").textContent =
+    "AI mengesan: " + detectedLabel;
+
+  const box = document.getElementById("feedbackBox");
+  box.classList.remove("hidden", "correct", "incorrect");
+
+  if (isCorrect) {
+    box.classList.add("correct");
+    box.textContent = "✓ TAHNIAH! JAWAPAN BETUL. " + item.explanation;
+  } else {
+    box.classList.add("incorrect");
+    box.textContent =
+      "✗ JAWAPAN KURANG TEPAT. Jawapan yang betul ialah " +
+      item.answer + ". " + item.explanation;
+  }
+
+  const nextButton = document.getElementById("nextButton");
+  nextButton.classList.remove("hidden");
+  nextButton.textContent =
+    currentScenario === 3 ? "LIHAT KEPUTUSAN" : "SENARIO SETERUSNYA";
+}
+
+// ========================================
+// SENARIO SETERUSNYA
+// ========================================
+
+function nextScenario() {
+  if (currentScenario < scenarios.length - 1) {
+    currentScenario++;
+    showScenario();
+  } else {
+    finishActivity();
+  }
+}
+
+// ========================================
+// PEMASA 10 MINIT
+// ========================================
+
+function startTimer() {
+  updateTimer();
+
+  timerInterval = setInterval(() => {
+    secondsLeft--;
+    updateTimer();
+
+    if (secondsLeft <= 0) {
+      finishActivity();
+    }
+  }, 1000);
+}
+
+function updateTimer() {
+  const minutes = Math.floor(secondsLeft / 60);
+  const seconds = secondsLeft % 60;
+
+  document.getElementById("timer").textContent =
+    String(minutes).padStart(2, "0") + ":" +
+    String(seconds).padStart(2, "0");
+}
+
+// ========================================
+// TAMAT AKTIVITI
+// ========================================
+
+async function finishActivity() {
+  if (finished) return;
+  finished = true;
+
+  clearInterval(timerInterval);
+  cancelAnimationFrame(animationFrame);
+
+  if (webcam) webcam.stop();
+
+  document.getElementById("gameScreen").classList.add("hidden");
+  document.getElementById("resultScreen").classList.remove("hidden");
+
+  const answered = answers.length;
+  const percentage = Math.round((score / scenarios.length) * 100);
+
+  document.getElementById("resultName").textContent =
+    studentName + " | " + studentClass;
+
+  document.getElementById("finalScore").textContent = score + "/4";
+  document.getElementById("finalPercentage").textContent = percentage + "%";
+
+  let message;
+
+  if (score === 4) {
+    message = "Cemerlang! Kamu memahami amalan integriti di perpustakaan.";
+  } else if (score >= 2) {
+    message = "Bagus! Teruskan usaha memahami nilai integriti.";
+  } else {
+    message = "Teruskan belajar. Amalkan sikap amanah dan bertanggungjawab.";
+  }
+
+  if (answered < 4) {
+    message += " Kamu menjawab " + answered + " daripada 4 senario.";
+  }
+
+  document.getElementById("resultMessage").textContent = message;
+  document.getElementById("progressBar").style.width = "100%";
+
+  await sendToSheets({
+    nama: studentName,
+    kelas: studentClass,
+    markah: score,
+    jumlah: 4,
+    peratus: percentage,
+    dijawab: answered,
+    masaSaat: TOTAL_TIME - secondsLeft,
+    status: answered === 4 ? "Selesai" : "Masa tamat",
+    jawapan: answers
+  });
+}
+
+// ========================================
+// HANTAR REKOD KE GOOGLE SHEETS
+// ========================================
+
+async function sendToSheets(data) {
+  const statusBox = document.getElementById("submissionStatus");
+  statusBox.textContent = "Sedang menghantar rekod...";
+
+  try {
+    await fetch(SHEETS_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify(data)
+    });
+
+    statusBox.textContent =
+      "Permintaan penghantaran dibuat. Sila semak Google Sheets untuk mengesahkan rekod diterima.";
+
+  } catch (error) {
+    console.error(error);
+    statusBox.textContent =
+      "Penghantaran gagal. Semak sambungan internet dan tetapan Google Apps Script.";
+  }
+}
+</script>
+</body>
+</html>
