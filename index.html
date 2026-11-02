@@ -696,32 +696,39 @@ async function finishActivity() {
 
 async function sendToSheets(data) {
   const statusBox = document.getElementById("submissionStatus");
-
   statusBox.textContent = "Sedang menghantar rekod...";
 
   try {
+    if (!data || typeof data !== "object") {
+      throw new Error("Data keputusan tidak sah.");
+    }
+
+    // Hantar sebagai borang URL-encoded supaya Apps Script
+    // boleh membaca data melalui e.parameter.payload.
+    const formData = new URLSearchParams();
+    formData.append("payload", JSON.stringify(data));
 
     await fetch(SHEETS_URL, {
       method: "POST",
       mode: "no-cors",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify(data)
+      body: formData
     });
 
     statusBox.textContent =
-      "Permintaan penghantaran telah dibuat. Buka Google Sheets dan semak sama ada rekod baharu muncul. Laman ini belum dapat mengesahkan penerimaan secara langsung.";
+      "Permintaan penghantaran telah dihantar. Sila semak rekod terkini dalam Google Sheets.";
+
+    console.log("Data dihantar ke Google Sheets:", data);
 
   } catch (error) {
-
-    console.error(error);
-
+    console.error("Ralat penghantaran Google Sheets:", error);
     statusBox.textContent =
-      "Penghantaran gagal. Semak sambungan internet dan tetapan Google Apps Script.";
+      "Penghantaran gagal: " + error.message +
+      ". Sila semak sambungan internet dan tetapan Google Apps Script.";
   }
 }
 
 </script>
 </body>
+</html>
+
 </html>
