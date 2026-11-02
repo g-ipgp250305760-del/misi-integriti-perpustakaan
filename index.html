@@ -195,7 +195,8 @@ footer {
 
   <p class="small center">
     Benarkan akses kamera apabila pelayar memintanya.
-    Pastikan pencahayaan mencukupi.
+    Pastikan tangan berada di tengah kamera, dekat dan jelas.
+    Elakkan wajah masuk dalam bingkai.
   </p>
   <p id="startError" class="small center" role="alert"></p>
 </section>
@@ -266,20 +267,21 @@ footer {
 </div>
 
 <script>
+
 // ========================================
 // PAUTAN MODEL DAN GOOGLE SHEETS
 // ========================================
 
 const MODEL_URL =
-"https://teachablemachine.withgoogle.com/models/EmgtTt2OS/";
+"https://teachablemachine.withgoogle.com/models/xicEg_-Op/";
 
 const SHEETS_URL =
-  "https://script.google.com/macros/s/AKfycbzu_xVaH0xt2pIv4KNlA3inqn8NrI9jXAjmB1GNkVKrcFTi8ZYZXPlvq62dCkowAHW9/exec";
+"https://script.google.com/macros/s/AKfycbzu_xVaH0xt2pIv4KNlA3inqn8NrI9jXAjmB1GNkVKrcFTi8ZYZXPlvq62dCkowAHW9/exec";
 
-// Tetapan pengesanan
-const CONFIDENCE_LIMIT = 0.90;
-const STABLE_TIME = 1200;
+const CONFIDENCE_LIMIT = 0.92;
+const STABLE_TIME = 1600;
 const TOTAL_TIME = 600;
+
 
 // ========================================
 // SENARIO PEMBELAJARAN
@@ -312,12 +314,15 @@ const scenarios = [
   }
 ];
 
+
 // ========================================
 // PEMBOLEH UBAH AKTIVITI
 // ========================================
 
 let model = null;
 let webcam = null;
+let handCanvas = null;
+let handContext = null;
 let currentScenario = 0;
 let score = 0;
 let answers = [];
@@ -331,6 +336,7 @@ let finished = false;
 let detecting = false;
 let studentName = "";
 let studentClass = "";
+
 
 // ========================================
 // MULAKAN AKTIVITI
@@ -361,6 +367,16 @@ async function startActivity() {
     await webcam.setup();
     await webcam.play();
 
+    // Kanvas khas untuk memfokuskan kawasan tengah kamera.
+    // Webcam asal 320x240; potong kawasan tengah 240x240.
+
+    handCanvas = document.createElement("canvas");
+    handCanvas.width = 224;
+    handCanvas.height = 224;
+    handContext = handCanvas.getContext("2d", {
+      willReadFrequently: true
+    });
+
     document.getElementById("camera").replaceChildren(webcam.canvas);
     document.getElementById("startScreen").classList.add("hidden");
     document.getElementById("gameScreen").classList.remove("hidden");
@@ -371,11 +387,14 @@ async function startActivity() {
 
   } catch (error) {
     console.error(error);
+
     document.getElementById("startButton").disabled = false;
+
     errorBox.textContent =
       "Model atau kamera gagal dimuatkan. Semak sambungan internet, pautan model dan kebenaran kamera. Cuba buka laman menggunakan Chrome.";
   }
 }
+
 
 // ========================================
 // PAPARKAN SENARIO
@@ -410,12 +429,37 @@ function showScenario() {
   document.getElementById("nextButton").classList.add("hidden");
 }
 
+
 // ========================================
 // PENGESANAN ISYARAT TEACHABLE MACHINE
 // ========================================
 
 function normalizeLabel(label) {
   return String(label).trim().toUpperCase().replace(/\s+/g, " ");
+}
+
+function updateHandCrop() {
+  if (!webcam || !webcam.canvas || !handContext) return;
+
+  const source = webcam.canvas;
+  const sourceWidth = source.width;
+  const sourceHeight = source.height;
+
+  const cropSize = Math.min(sourceWidth, sourceHeight);
+  const cropX = Math.floor((sourceWidth - cropSize) / 2);
+  const cropY = Math.floor((sourceHeight - cropSize) / 2);
+
+  handContext.clearRect(
+    0, 0,
+    handCanvas.width,
+    handCanvas.height
+  );
+
+  handContext.drawImage(
+    source,
+    cropX, cropY, cropSize, cropSize,
+    0, 0, handCanvas.width, handCanvas.height
+  );
 }
 
 async function detectLoop() {
@@ -427,7 +471,10 @@ async function detectLoop() {
     detecting = true;
 
     try {
-      const predictions = await model.predict(webcam.canvas);
+      updateHandCrop();
+
+      const predictions = await model.predict(handCanvas);
+
       predictions.sort((a, b) => b.probability - a.probability);
 
       const best = predictions[0];
@@ -442,6 +489,7 @@ async function detectLoop() {
          label === "TIDAK BERINTEGRITI") &&
         confidence >= CONFIDENCE_LIMIT
       ) {
+
         if (stableLabel !== label) {
           stableLabel = label;
           stableStart = Date.now();
@@ -456,18 +504,23 @@ async function detectLoop() {
         if (elapsed >= STABLE_TIME) {
           recordAnswer(label);
         }
+
       } else {
+
         stableLabel = "";
         stableStart = 0;
 
         document.getElementById("aiStatus").textContent =
-          "Isyarat belum jelas. Cuba tunjukkan ibu jari dengan lebih jelas.";
+          "Isyarat belum jelas. Letakkan tangan di tengah kamera dan kekalkan ibu jari ke atas atau ke bawah.";
       }
 
     } catch (error) {
+
       console.error(error);
+
       document.getElementById("aiStatus").textContent =
         "Pengesanan mengalami masalah. Cuba lagi.";
+
     } finally {
       detecting = false;
     }
@@ -477,6 +530,7 @@ async function detectLoop() {
     animationFrame = requestAnimationFrame(detectLoop);
   }
 }
+
 
 // ========================================
 // SEMAK DAN SIMPAN JAWAPAN
@@ -502,11 +556,13 @@ function recordAnswer(detectedLabel) {
     "AI mengesan: " + detectedLabel;
 
   const box = document.getElementById("feedbackBox");
+
   box.classList.remove("hidden", "correct", "incorrect");
 
   if (isCorrect) {
     box.classList.add("correct");
-    box.textContent = "✓ TAHNIAH! JAWAPAN BETUL. " + item.explanation;
+    box.textContent =
+      "✓ TAHNIAH! JAWAPAN BETUL. " + item.explanation;
   } else {
     box.classList.add("incorrect");
     box.textContent =
@@ -515,10 +571,15 @@ function recordAnswer(detectedLabel) {
   }
 
   const nextButton = document.getElementById("nextButton");
+
   nextButton.classList.remove("hidden");
+
   nextButton.textContent =
-    currentScenario === 3 ? "LIHAT KEPUTUSAN" : "SENARIO SETERUSNYA";
+    currentScenario === 3
+      ? "LIHAT KEPUTUSAN"
+      : "SENARIO SETERUSNYA";
 }
+
 
 // ========================================
 // SENARIO SETERUSNYA
@@ -532,6 +593,7 @@ function nextScenario() {
     finishActivity();
   }
 }
+
 
 // ========================================
 // PEMASA 10 MINIT
@@ -559,12 +621,14 @@ function updateTimer() {
     String(seconds).padStart(2, "0");
 }
 
+
 // ========================================
 // TAMAT AKTIVITI
 // ========================================
 
 async function finishActivity() {
   if (finished) return;
+
   finished = true;
 
   clearInterval(timerInterval);
@@ -576,29 +640,40 @@ async function finishActivity() {
   document.getElementById("resultScreen").classList.remove("hidden");
 
   const answered = answers.length;
-  const percentage = Math.round((score / scenarios.length) * 100);
+
+  const percentage = Math.round(
+    (score / scenarios.length) * 100
+  );
 
   document.getElementById("resultName").textContent =
     studentName + " | " + studentClass;
 
-  document.getElementById("finalScore").textContent = score + "/4";
-  document.getElementById("finalPercentage").textContent = percentage + "%";
+  document.getElementById("finalScore").textContent =
+    score + "/4";
+
+  document.getElementById("finalPercentage").textContent =
+    percentage + "%";
 
   let message;
 
   if (score === 4) {
-    message = "Cemerlang! Kamu memahami amalan integriti di perpustakaan.";
+    message =
+      "Cemerlang! Kamu memahami amalan integriti di perpustakaan.";
   } else if (score >= 2) {
-    message = "Bagus! Teruskan usaha memahami nilai integriti.";
+    message =
+      "Bagus! Teruskan usaha memahami nilai integriti.";
   } else {
-    message = "Teruskan belajar. Amalkan sikap amanah dan bertanggungjawab.";
+    message =
+      "Teruskan belajar. Amalkan sikap amanah dan bertanggungjawab.";
   }
 
   if (answered < 4) {
-    message += " Kamu menjawab " + answered + " daripada 4 senario.";
+    message +=
+      " Kamu menjawab " + answered + " daripada 4 senario.";
   }
 
   document.getElementById("resultMessage").textContent = message;
+
   document.getElementById("progressBar").style.width = "100%";
 
   await sendToSheets({
@@ -614,15 +689,18 @@ async function finishActivity() {
   });
 }
 
+
 // ========================================
 // HANTAR REKOD KE GOOGLE SHEETS
 // ========================================
 
 async function sendToSheets(data) {
   const statusBox = document.getElementById("submissionStatus");
+
   statusBox.textContent = "Sedang menghantar rekod...";
 
   try {
+
     await fetch(SHEETS_URL, {
       method: "POST",
       mode: "no-cors",
@@ -633,14 +711,17 @@ async function sendToSheets(data) {
     });
 
     statusBox.textContent =
-      "Permintaan penghantaran dibuat. Sila semak Google Sheets untuk mengesahkan rekod diterima.";
+      "Permintaan penghantaran telah dibuat. Buka Google Sheets dan semak sama ada rekod baharu muncul. Laman ini belum dapat mengesahkan penerimaan secara langsung.";
 
   } catch (error) {
+
     console.error(error);
+
     statusBox.textContent =
       "Penghantaran gagal. Semak sambungan internet dan tetapan Google Apps Script.";
   }
 }
+
 </script>
 </body>
 </html>
